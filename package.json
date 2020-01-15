@@ -1,0 +1,17 @@
+{
+  "name": "depchecker",
+  "version": "0.0.0",
+  "description": "Update a dependency's version in all projects in a monorepo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "replace": "^1.1.5"
+  },
+  "devDependencies": {
+    "prettier": "^1.19.1"
+  }
+}
