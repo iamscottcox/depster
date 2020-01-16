@@ -1,8 +1,11 @@
 {
-  "name": "depchecker",
-  "version": "0.0.0",
+  "name": "depster",
+  "version": "0.0.1",
   "description": "Update a dependency's version in all projects in a monorepo",
   "main": "index.js",
+  "bin": {
+    "depster": "./index.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
