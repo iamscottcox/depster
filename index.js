@@ -1,11 +1,16 @@
+#! /usr/bin/env node
+
 const fs = require("fs");
 const path = require("path");
-const [nodePath, filePath, depName, newVersion] = process.argv;
+const isEqual = require("lodash.isequal");
+const inquirer = require("inquirer");
+const { exec, execSync } = require("child_process");
+const [nodePath, filePath, command, ...rest] = process.argv;
 
 const { DEPENDENCIES, DEV_DEPENDENCIES } = require("./constants");
 
-const reposPath = path.resolve(__dirname, "repos");
-
+/*** UTILS ***/
+// Getting the dependency type
 const getDependencyType = (depName, packageJSONData) => {
   if (
     packageJSONData.dependencies &&
@@ -24,49 +29,96 @@ const getDependencyType = (depName, packageJSONData) => {
   return undefined;
 };
 
-if (depName === undefined) {
-  console.error("You have not provided the name of the dependency.");
-  process.exit();
-}
+// Getting Versions
+const createPackageMap = () =>
+  fs.readdirSync(reposPath).reduce((prev, repoName) => {
+    const repoPath = path.resolve(reposPath, repoName);
+    const jsonPath = path.resolve(repoPath, "package.json");
+    const rawData = fs.readFileSync(jsonPath);
+    const { name, version } = JSON.parse(rawData);
 
-if (newVersion === undefined) {
-  console.error("You have not specified the new version number");
-  process.exit();
-}
+    prev[name] = version;
 
-fs.readdir(reposPath, (err, projects) => {
-  if (err) {
-    console.err("There were no projects in the repos/ directory");
-  }
+    return prev;
+  }, {});
 
-  projects.forEach(projectName => {
-    const projectPath = path.resolve(reposPath, projectName);
-    fs.readdir(projectPath, err => {
-      if (err) {
-        console.error(`There are no files in ${projectName}`);
-        console.error("Skipping...");
-      }
+// Write to JSON file
 
-      const jsonPath = path.resolve(projectPath, "package.json");
-      const rawData = fs.readFileSync(jsonPath);
-      const data = JSON.parse(rawData);
-      const { dependencies, devDependencies, name } = data;
+/*** COMMANDS ***/
+const update = () => {
+  console.log("Working...");
+  let changesMade = false;
 
-      if (name === depName) {
-        return;
-      }
+  fs.readdirSync(reposPath).forEach(repoName => {
+    // Iterate over all packages
+    const packageMap = createPackageMap();
+    const packageNames = Object.keys(packageMap);
+    const repoPath = path.resolve(reposPath, repoName);
+    const jsonPath = path.resolve(repoPath, "package.json");
+    const rawData = fs.readFileSync(jsonPath);
+    const data = JSON.parse(rawData);
 
-      const depType = getDependencyType(depName, data);
+    let shouldInstall = false;
 
+    packageNames.forEach(packageName => {
+      // Check to see if this repo has that package as a dependency
+      const depType = getDependencyType(packageName, data);
+      // Skip if it doesn't
       if (depType === undefined) {
         return;
       }
 
-      data[depType][depName] = newVersion;
+      const currentVersion = data[depType][packageName];
+      const newVersion = `^${packageMap[packageName]}`;
 
-      fs.writeFile(jsonPath, data, err => {
-        console.error(err);
-      });
+      if (currentVersion === newVersion) {
+        return;
+      }
+
+      changesMade = true;
+      shouldInstall = true;
+
+      // Inform the user of the changing happening to the package.json
+      console.log(
+        `${repoName}: ${packageName}: ${currentVersion} --> ${newVersion}`
+      );
+      // Make the change to the JSON object
+      data[depType][packageName] = newVersion;
     });
+
+    if (shouldInstall === true) {
+      // Write the new changes to the package.json file
+      fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
+      // Run npm install in the repo
+      exec(`npm --prefix ${repoPath} install ${repoPath}`, err => {
+        if (err === null) {
+          // Console.log a message to inform the user that changes were made to the repo and that they need to be committed
+          console.log(`${repoName}: SUCCESS!! Don't forget to commit!`);
+        } else {
+          console.error(
+            `Something went wrong when installing dependencies in ${repoName}. Skipping...`
+          );
+          console.error(err);
+        }
+      });
+    }
   });
-});
+  if (changesMade === false) {
+    console.log("No changes need to be made.");
+    console.log("Exiting...");
+  }
+};
+
+const version = () => {};
+
+/*************** RUN THE CODE ***************/
+
+const reposPath = path.resolve(process.cwd(), "repos");
+
+switch (command) {
+  case "update":
+    return update();
+  default:
+    console.error(`Command "${command}" not recognised`);
+    return process.exit();
+}
