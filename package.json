@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "lodash.isequal": "^4.5.0",
-    "replace": "^1.1.5"
+    "replace": "^1.2.2"
   },
   "devDependencies": {
     "prettier": "^1.19.1"
